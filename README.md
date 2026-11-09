@@ -1,55 +1,50 @@
-# Knight Vanish v0.1 ♞
+# Knight Vanish v0.1.1 ♞
 
-Ein minimalistisches Springer-Puzzlespiel mit **25 garantiert lösbaren Leveln**.
+Minimalistisches Springer-Puzzlespiel mit **25 garantiert lösbaren Leveln**.
 
 ## Spielregeln
 
-- Der Springer springt wie im Schach (zwei Felder in eine Richtung, eines senkrecht dazu).
-- Die Plattform, von der du abspringst, verschwindet.
-- Jede Plattform muss genau einmal besucht werden.
-- Das Zielfeld mit der **goldenen Krone** muss als letztes erreicht werden.
-- Bei einer Sackgasse kannst du das Level von vorne beginnen.
+- Springe wie ein Springer im Schach (1×2 Felder in L-Form).
+- Jede verlassene Plattform verschwindet dauerhaft für diesen Versuch.
+- Besuche jede Plattform genau einmal und erreiche die goldene Krone zuletzt.
+- Neustart setzt das aktuelle Level zurück; Verlassen führt zur Levelübersicht.
 
-## Inhalt der ersten Version
+## Neu in v0.1.1
 
-- 25 vorab auf Lösbarkeit geprüfte Level, mit zunehmender Größe und Schwierigkeit.
-- Hellblauer Hintergrund und Glasplattformen.
-- Sprung- und Verschwindeanimation.
-- Levelauswahl mit Freischaltung des jeweils nächsten Levels.
-- Automatische Speicherung des Fortschritts im **localStorage** des Browsers.
-- Neustart-Button.
+- **Aufgeräumter Spielbildschirm:** nur `Level X`, `Verlassen` und `Neustart`.
+- **Größeres Spielfeld:** füllt die verfügbare Fläche auf Handy, Tablet und Desktop besser aus.
+- **Blauerer Spielbereich:** Glasplattformen heben sich deutlicher ab.
+- **Schnellere Springerin-Animation:** ca. 140 ms statt 340 ms.
+- **Sofortige Eingabe:** weitere Sprünge können bereits während der Animation eingegeben werden. Aktuelle Animationen werden beim nächsten Sprung abgebrochen, der neue Spielzustand wird sofort verarbeitet.
+- Die bisherigen 25 Level und die Speicherkennung sind unverändert – **dein bisheriger Fortschritt bleibt im selben Browser erhalten**.
 
-**Absichtlich noch nicht enthalten:** Sterne, Zug zurück, Hinweise, Daily-Modus, Skins, Konten, Server.
+## Installation auf GitHub Pages / Update der bestehenden Version
 
-## Schnellstart
+1. Entpacke die ZIP-Datei.
+2. Öffne dein vorhandenes GitHub-Repository.
+3. Wähle **Add file → Upload files** und lade alle entpackten Dateien hoch. Bestätige das **Ersetzen** gleichnamiger Dateien und klicke **Commit changes**.
+4. Lass deine bisherigen **Settings → Pages**-Einstellungen wie sie sind. Nach dem erfolgreichen Deployment ist die neue Version unter deiner bisherigen GitHub-Pages-Adresse verfügbar.
+5. Falls noch das alte Design zu sehen ist, die Seite einmal hart neu laden oder im privaten Tab testen.
 
-Öffne `index.html` im Browser. Es ist keine Installation nötig. Die Dateien `index.html`, `style.css`, `levels.js`, `script.js` und `favicon.svg` müssen im selben Ordner liegen.
+**Alternativ:** Mit `knight-vanish-v0.1.1-update-only.zip` brauchst du nur `index.html`, `style.css` und `script.js` zu aktualisieren. Die übrigen Dateien bleiben unverändert.
 
-## Auf GitHub Pages veröffentlichen
+## Neue Veröffentlichung
 
-1. Erstelle ein **öffentliches** neues Repository auf <https://github.com/new>, beispielsweise `knight-vanish`.
-2. Entpacke die heruntergeladene ZIP-Datei.
-3. Wähle im Repository **Add file → Upload files** und lade **die Dateien aus dem entpackten Ordner** hoch. Wichtig: `index.html` muss direkt im obersten Verzeichnis liegen, nicht in einem Unterordner.
-4. Klicke **Commit changes**.
-5. Öffne **Settings → Pages**. Stelle unter **Build and deployment → Source** auf **Deploy from a branch**.
-6. Wähle als Branch **main** und als Verzeichnis **/(root)**. Speichern.
-7. Nach der Veröffentlichung findest du die Webseite normalerweise unter `https://DEIN-BENUTZERNAME.github.io/knight-vanish/`.
+Für ein neues öffentliches Repository `knight-vanish`: alle ZIP-Dateien ins Stammverzeichnis hochladen, dann unter **Settings → Pages** als Quelle **Deploy from a branch**, Branch **main**, Verzeichnis **/(root)** wählen. Die fertige Adresse lautet normalerweise `https://DEIN-BENUTZERNAME.github.io/knight-vanish/`.
 
-Siehe auch die offiziellen [GitHub-Pages-Anweisungen](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site).
+## Technische Details
 
-## Technische Hinweise
-
-- Reines HTML, CSS und JavaScript; **keine Abhängigkeiten** und keine Build-Schritte.
-- Alle 25 Level wurden mit einem Python-Solver geprüft, der legalen Springerzügen, einmaligem Betreten jedes Felds und dem Ziel als Endposition folgt.
-- Der lokale Fortschritt gilt nur für den jeweiligen Browser und das jeweilige Gerät. Wer Browserdaten löscht, verliert den Fortschritt.
-- Alle Spielressourcen sind lokal; es werden keine externen Bilder oder Schriftarten geladen.
+- HTML, CSS, JavaScript, keine externen Abhängigkeiten.
+- 25 feste, vorab mit einem Solver geprüfte Level.
+- Erledigte Level und freigeschalteter Fortschritt werden per `localStorage` gespeichert, unter derselben Speicherkennung wie v0.1 (`knight-vanish-v0.1-unlocked`).
+- Keine Sterne, keine Rücknahme, keine Hinweise, keine Skins und kein Daily-Modus.
+- `pointerdown` sorgt für unmittelbare Touch-Steuerung; eine alternative Tastaturbedienung bleibt möglich.
 
 ## Dateien
 
-| Datei | Zweck |
-|---|---|
-| `index.html` | Drei Ansichten: Startseite, Levelauswahl, Spiel |
-| `style.css` | Gestaltung, responsive Layouts und Animationen |
-| `levels.js` | Die 25 Level mit Start, Ziel und Plattformfeldern |
-| `script.js` | Spielregeln, Bedienung, Freischaltung und Speicherung |
-| `favicon.svg` | Kleines Springer-Icon für den Browser |
+- `index.html` — Startseite, Levelübersicht, aufgeräumte Spielansicht
+- `style.css` — Design, Glasplattformen, responsive Darstellung und Animationen
+- `script.js` — Logik, sofortige Eingabe, Fortschritt, Navigation
+- `levels.js` — die 25 unveränderten Level
+- `favicon.svg` — Browser-Icon
+- `.nojekyll` — GitHub-Pages-Unterstützung

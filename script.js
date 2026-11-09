@@ -16,8 +16,9 @@
   let currentLevel = null;
   let position = null;
   let visited = new Set();
-  let busy = false;
   let result = '';
+  let activeFlight = null;
+  let resultTimer = null;
 
   function knightMove(from, to, size) {
     const dx = Math.abs((from % size) - (to % size));
@@ -40,6 +41,8 @@
   }
 
   function showScreen(name) {
+    cancelFlight();
+    if (resultTimer !== null) { clearTimeout(resultTimer); resultTimer = null; }
     hideResult();
     Object.entries(screens).forEach(([key, element]) => { element.hidden = key !== name; });
     if (name === 'home') renderHome();
@@ -103,70 +106,92 @@
 
   const crownSVG = '<svg class="crown-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" aria-hidden="true"><path d="m6 15 10 10 8-15 8 15 10-10-3.5 23h-29L6 15Z"/><path d="M10 41h28" stroke-linecap="round" stroke-width="3" fill="none"/><circle cx="6" cy="14" r="2.5"/><circle cx="24" cy="9" r="2.5"/><circle cx="42" cy="14" r="2.5"/></svg>';
 
-  function renderBoard() {
-    if (!currentLevel) return;
+  // Die Felder werden einmal pro Level angelegt. Bei einem Zug werden nur
+  // ihre Zustände aktualisiert; keine Buttons werden während der Animation gesperrt.
+  function buildBoard() {
     const size = currentLevel.size;
     const cells = new Set(currentLevel.cells);
-    const reachable = new Set(result ? [] : legalDestinations());
     board.style.gridTemplateColumns = `repeat(${size}, minmax(0, 1fr))`;
-    // 4x4 und 5x5 dürfen auf großen Bildschirmen nicht unnötig riesig werden.
-    board.style.maxWidth = `${Math.min(530, size * 77)}px`;
     const fragment = document.createDocumentFragment();
     for (let i = 0; i < size * size; i++) {
       const holder = document.createElement('div');
       holder.className = 'board-cell';
-      if (!cells.has(i)) {
-        fragment.appendChild(holder);
-        continue;
+      if (cells.has(i)) {
+        const tile = document.createElement('button');
+        tile.type = 'button';
+        tile.className = 'tile';
+        tile.dataset.cell = String(i);
+        const row = Math.floor(i / size) + 1, col = i % size + 1;
+        tile.setAttribute('aria-label', `Plattform, Reihe ${row}, Spalte ${col}`);
+        holder.appendChild(tile);
       }
-      const tile = document.createElement('button');
-      tile.type = 'button';
-      tile.className = 'tile';
-      tile.dataset.cell = String(i);
-      const gone = visited.has(i) && i !== position;
-      if (gone) tile.classList.add('tile--blocked');
-      if (i === currentLevel.goal) tile.classList.add('tile--goal');
-      if (i === position) tile.classList.add('tile--knight');
-      if (reachable.has(i)) tile.classList.add('tile--reachable');
-      if (i === position) tile.innerHTML = '<span class="knight" aria-hidden="true">♞</span>';
-      else if (i === currentLevel.goal) tile.innerHTML = crownSVG;
-      else if (reachable.has(i)) tile.innerHTML = '<span class="move-dot" aria-hidden="true"></span>';
-      const row = Math.floor(i / size) + 1, col = i % size + 1;
-      tile.setAttribute('aria-label', i === position ? `Springer, Reihe ${row}, Spalte ${col}` :
-        gone ? `Verschwundene Plattform, Reihe ${row}, Spalte ${col}` :
-        i === currentLevel.goal ? `Krone, Ziel, Reihe ${row}, Spalte ${col}` :
-        `Plattform, Reihe ${row}, Spalte ${col}${reachable.has(i) ? ', erreichbarer Sprung' : ''}`);
-      tile.disabled = !reachable.has(i) || busy || !!result;
-      tile.addEventListener('click', () => makeMove(i));
-      holder.appendChild(tile);
       fragment.appendChild(holder);
     }
     board.replaceChildren(fragment);
-    const remaining = currentLevel.cells.length - visited.size;
-    $('remaining-count').textContent = String(remaining);
-    $('game-tip').textContent = remaining === 0 ? 'Alle Plattformen geschafft.' :
-      remaining === 1 ? 'Nur noch die Krone!' : 'Tippe auf einen markierten Sprung.';
+    updateBoard();
+    requestAnimationFrame(syncBoardSize);
+  }
+
+  function updateBoard() {
+    if (!currentLevel) return;
+    const reachable = new Set(result ? [] : legalDestinations());
+    board.querySelectorAll('.tile').forEach(tile => {
+      const i = Number(tile.dataset.cell);
+      const gone = visited.has(i) && i !== position;
+      const here = i === position;
+      const goal = i === currentLevel.goal;
+      const canJump = reachable.has(i);
+      tile.classList.toggle('tile--blocked', gone);
+      tile.classList.toggle('tile--goal', goal);
+      tile.classList.toggle('tile--knight', here);
+      tile.classList.toggle('tile--reachable', canJump);
+      tile.disabled = !canJump || !!result;
+      if (here) tile.innerHTML = '<span class="knight" aria-hidden="true">♞</span>';
+      else if (goal && !gone) tile.innerHTML = crownSVG;
+      else if (canJump) tile.innerHTML = '<span class="move-dot" aria-hidden="true"></span>';
+      else tile.replaceChildren();
+    });
+  }
+
+  // Das Spielfeld nutzt die komplette verfügbare Breite ODER Höhe.
+  // Gerade bei 4x4-Leveln gibt es keine künstliche Größenbegrenzung mehr.
+  function syncBoardSize() {
+    const zone = $('board-zone');
+    if (screens.game.hidden || !zone.clientWidth || !zone.clientHeight) return;
+    const side = Math.max(100, Math.floor(Math.min(zone.clientWidth - 16, zone.clientHeight - 16, 750)));
+    board.style.width = `${side}px`;
+  }
+
+  function cancelFlight() {
+    if (!activeFlight) return;
+    const flight = activeFlight;
+    activeFlight = null;
+    flight.animation?.cancel();
+    flight.tileKnight.style.visibility = '';
+    flight.element.remove();
   }
 
   function startLevel(index) {
     if (index < 0 || index >= LEVELS.length || index + 1 > unlocked) return;
+    cancelFlight();
     currentLevel = LEVELS[index];
     position = currentLevel.start;
     visited = new Set([position]);
-    busy = false;
     result = '';
-    $('level-number').textContent = String(currentLevel.id).padStart(2,'0');
+    $('level-number').textContent = String(currentLevel.id);
     showScreen('game');
-    renderBoard();
+    buildBoard();
   }
 
   function resetLevel() {
-    if (!currentLevel || busy) return;
+    if (!currentLevel) return;
+    cancelFlight();
+    if (resultTimer !== null) { clearTimeout(resultTimer); resultTimer = null; }
     position = currentLevel.start;
     visited = new Set([position]);
     result = '';
     hideResult();
-    renderBoard();
+    buildBoard();
   }
 
   function hideResult() { $('result-overlay').hidden = true; }
@@ -187,53 +212,66 @@
     $('result-main').focus();
   }
 
-  function finishMove(next) {
+  function makeMove(next) {
+    // Der Spielzustand wird SOFORT aktualisiert; die Grafik läuft parallel.
+    // Dadurch lassen sich auch die letzten drei Plattformen schnell antippen.
+    if (result || !legalDestinations().includes(next)) return;
+    cancelFlight();
+    const fromTile = board.querySelector(`[data-cell="${position}"]`);
+    const toTile = board.querySelector(`[data-cell="${next}"]`);
+    const a = fromTile?.getBoundingClientRect();
+    const b = toTile?.getBoundingClientRect();
+    const rect = board.getBoundingClientRect();
+
     position = next;
     visited.add(next);
-    busy = false;
-    renderBoard();
-    if (visited.size === currentLevel.cells.length && next === currentLevel.goal) {
-      if (currentLevel.id === unlocked) {
-        unlocked = Math.min(LEVELS.length + 1, unlocked + 1);
-        saveProgress();
-      }
-      showResult(true);
-    } else if (legalDestinations().length === 0) {
-      showResult(false);
-    }
-  }
+    updateBoard();
 
-  function makeMove(next) {
-    if (busy || result || !legalDestinations().includes(next)) return;
-    busy = true;
-    const sourceTile = board.querySelector(`[data-cell="${position}"]`);
-    const destTile = board.querySelector(`[data-cell="${next}"]`);
-    if (!sourceTile || !destTile) { finishMove(next); return; }
-    const a = sourceTile.getBoundingClientRect();
-    const b = destTile.getBoundingClientRect();
-    const r = board.getBoundingClientRect();
-    const flying = document.createElement('div');
-    flying.className = 'flying-knight';
-    flying.innerHTML = '<span class="knight" aria-hidden="true">♞</span>';
-    flying.style.width = `${a.width}px`;
-    flying.style.height = `${a.height}px`;
-    flying.style.left = `${a.left - r.left}px`;
-    flying.style.top = `${a.top - r.top}px`;
-    board.appendChild(flying);
-    sourceTile.querySelector('.knight')?.classList.add('knight--hidden');
-    sourceTile.classList.add('tile--vanish');
-    const dx = b.left - a.left;
-    const dy = b.top - a.top;
-    // Dekorative Animation. Die Spielzustände ändern sich erst nach der Landung.
-    const animation = flying.animate([
-      {transform:'translate(0px,0px) scale(1)',offset:0},
-      {transform:`translate(${dx / 2}px,${dy / 2 - 22}px) scale(1.08)`,offset:.5},
-      {transform:`translate(${dx}px,${dy}px) scale(1)`,offset:1}
-    ], {duration:340,easing:'ease-in-out'});
-    animation.finished.catch(() => {}).then(() => {
-      flying.remove();
-      finishMove(next);
-    });
+    if (a && b && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const knight = toTile.querySelector('.knight');
+      if (knight) {
+        knight.style.visibility = 'hidden';
+        const flying = document.createElement('div');
+        flying.className = 'flying-knight';
+        flying.innerHTML = '<span class="knight" aria-hidden="true">♞</span>';
+        flying.style.width = `${a.width}px`;
+        flying.style.height = `${a.height}px`;
+        flying.style.left = `${a.left - rect.left}px`;
+        flying.style.top = `${a.top - rect.top}px`;
+        board.appendChild(flying);
+        const dx = b.left - a.left;
+        const dy = b.top - a.top;
+        const animation = flying.animate([
+          {transform: 'translate(0px, 0px) scale(1)', offset: 0},
+          {transform: `translate(${dx / 2}px, ${dy / 2 - 12}px) scale(1.06)`, offset: .5},
+          {transform: `translate(${dx}px, ${dy}px) scale(1)`, offset: 1}
+        ], {duration: 140, easing: 'ease-out'});
+        const flight = {element: flying, animation, tileKnight: knight};
+        activeFlight = flight;
+        animation.finished.catch(() => {}).then(() => {
+          if (activeFlight !== flight) return;
+          activeFlight = null;
+          knight.style.visibility = '';
+          flying.remove();
+        });
+      }
+    }
+
+    const won = visited.size === currentLevel.cells.length && next === currentLevel.goal;
+    const stuck = !won && legalDestinations().length === 0;
+    if (won && currentLevel.id === unlocked) {
+      unlocked = Math.min(LEVELS.length + 1, unlocked + 1);
+      saveProgress();
+    }
+    if (won || stuck) {
+      // Nur die Ergebnisanzeige wartet kurz, niemals die Eingabe während des Spiels.
+      result = won ? 'won' : 'lost';
+      updateBoard();
+      resultTimer = window.setTimeout(() => {
+        resultTimer = null;
+        showResult(won);
+      }, 155);
+    }
   }
 
   function resultPrimary() {
@@ -247,9 +285,29 @@
   $('continue-button').addEventListener('click', () => startLevel(Math.min(unlocked, LEVELS.length) - 1));
   $('select-level-button').addEventListener('click', () => showScreen('levels'));
   $('levels-back').addEventListener('click', () => showScreen('home'));
-  $('game-back').addEventListener('click', () => { if (!busy) showScreen('levels'); });
-  $('restart-button').addEventListener('click', resetLevel);
+  $('game-back').addEventListener('click', () => showScreen('levels'));
   $('restart-bottom').addEventListener('click', resetLevel);
+
+  // pointerdown reagiert unmittelbar auf schnelle Touch-Folgen; Click bleibt
+  // für Tastatur/Screenreader verfügbar (Enter/Leertaste, detail === 0).
+  board.addEventListener('pointerdown', (event) => {
+    const tile = event.target.closest('.tile');
+    if (!tile || tile.disabled) return;
+    event.preventDefault();
+    makeMove(Number(tile.dataset.cell));
+  });
+  board.addEventListener('click', (event) => {
+    if (event.detail !== 0) return;
+    const tile = event.target.closest('.tile');
+    if (!tile || tile.disabled) return;
+    makeMove(Number(tile.dataset.cell));
+  });
+
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(syncBoardSize).observe($('board-zone'));
+  } else {
+    window.addEventListener('resize', syncBoardSize);
+  }
   $('result-main').addEventListener('click', resultPrimary);
   $('result-secondary').addEventListener('click', () => showScreen('levels'));
 
